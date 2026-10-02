@@ -2,12 +2,13 @@
 ## Title: ServerTextCN_Mcode |cff33ff99服务器文本汉化|r
 ## Notes: NPC、菜单和训练师窗口汉化；战场播报与屏幕公告汉化。仅使用内置词典，可查看记录、复制漏译或误译反馈。/stcn show 打开设置。
 ## Author: Mcode
-## Version: 3.1
+## Version: 3.2
 ## SavedVariables: McodeSTCN_DB
 ## OptionalDeps: Mcode_BGTextCN
 ServerTextCN_Mcode_Data.lua
 Core.lua
 Templates.lua
+VariableHints.lua
 Notifications.lua
 Window.lua
 AnnouncementRules.lua

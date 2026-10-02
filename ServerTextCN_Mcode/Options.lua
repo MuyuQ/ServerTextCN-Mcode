@@ -109,6 +109,7 @@ end
 function O.RecordText(module, item, feedback)
     local lines = {}
     if feedback then lines[#lines + 1] = "ServerTextCN_Mcode " .. C.version .. " · " .. moduleNames[module] end
+    lines[#lines + 1] = item.cn and "【汉化记录】" or "【未汉化记录】"
     lines[#lines + 1] = "原文：\n" .. (feedback and tostring(item.rawText or item.t or "") or visibleText(item.rawText or item.t))
     if item.cn then lines[#lines + 1] = "译文：\n" .. (feedback and tostring(item.cn) or visibleText(item.cn)) end
     if item.displayText and item.displayText ~= item.rawText then
@@ -127,6 +128,7 @@ function O.RecordText(module, item, feedback)
     if item.event then context = context .. "\n事件：" .. item.event end
     context = context .. "\n最近出现：" .. tostring(item.d or "未知") .. " · 次数：" .. tostring(item.count or 1)
     context = context .. "\n采集时词典版本：" .. tostring(item.dictionaryVersion or "未记录（旧版记录）")
+    context = context .. "\n采集时插件版本：" .. tostring(item.version or "未记录")
     if item.h then context = context .. "\n匹配：" .. (tagNames[item.h] or tostring(item.h)) end
     if item.player and item.player.name and item.player.name ~= "" then
         context = context .. "\n采集时角色：" .. item.player.name
@@ -135,6 +137,8 @@ function O.RecordText(module, item, feedback)
         context = context .. "\n旧版历史记录；译文不代表当前内置词典，缺失的现场信息未补造。"
     end
     lines[#lines + 1] = context
+    local hints = C.VariableHints.Describe(module, item)
+    lines[#lines + 1] = feedback and hints or visibleText(hints)
     return table.concat(lines, "\n\n")
 end
 
