@@ -1,5 +1,5 @@
 -- ServerTextCN_Mcode 3.1: built-in translation and read-only feedback records.
-McodeSTCN = { version = "3.1", schema = 4, ready = false, listeners = {} }
+McodeSTCN = { version = "3.2", schema = 4, ready = false, listeners = {} }
 local C = McodeSTCN
 
 function C.Copy(value)
@@ -185,6 +185,7 @@ function C.Record(module, raw, cn, tag, ctx, meta)
     item.variableEvidence = meta and meta.evidence
     item.b = meta and meta.best
     item.history, item.legacy, item.version = nil, nil, C.version
+    item.variableHints = C.VariableHints.Analyze(item, "capture")
     item.dictionaryVersion = C.DictionaryVersion(module)
     list[#list + 1] = item -- repeated encounters also move to the most recent position
     while #list > (hit and 200 or 300) do table.remove(list, 1) end
@@ -277,6 +278,17 @@ function C.Initialize()
     end
     if db.ui.lastModule ~= "announcements" then db.ui.lastModule = "window" end
     db.schemaVersion = C.schema
+    for _, module in ipairs({ "window", "announcements" }) do
+        for _, hit in ipairs({ false, true }) do
+            for _, item in ipairs(C.List(module, hit)) do
+                local hints = item.variableHints
+                if type(hints) ~= "table" or hints.analysisVersion ~= C.VariableHints.version
+                    or hints.analyzedText ~= (item.rawText or item.t or "") or item.history or item.legacy then
+                    item.variableHints = C.VariableHints.Analyze(item)
+                end
+            end
+        end
+    end
     C.ready = true
     if C.Window then C.Window.ClearCache() end
 end
