@@ -313,7 +313,7 @@ function O.BuildPage(panel, module)
         end)
     end)
     page.clear:SetPoint("BOTTOMRIGHT", -16, 14)
-    local guide = label(panel, "AI 补译方法与提示词：请阅读插件目录内《使用说明-3.1.md》。", 0, 0, "GameFontHighlightSmall")
+    local guide = label(panel, "AI 补译方法与提示词：请阅读插件目录内《README.md》。", 0, 0, "GameFontHighlightSmall")
     guide:ClearAllPoints(); guide:SetPoint("BOTTOMLEFT", 16, 41); guide:SetPoint("BOTTOMRIGHT", -16, 41)
     guide:SetHeight(25); guide:SetJustifyV("TOP")
     page.sources = create("Frame", nil, panel)
@@ -411,8 +411,8 @@ function O.Register()
         { "插件作用", "汉化服务器提供的 NPC 对话、选项，以及战场播报和屏幕公告。\n两个功能可在左侧子页面分别开启。" },
         { "汉化范围", "汉化内容取决于内置词典的收录情况，未收录的文字会保留原文。\n本插件不翻译玩家聊天，也不提供实时机器翻译。" },
         { "使用方法", "开启对应功能后，插件会自动汉化已收录的内容。\n开启漏译收集后，发现未汉化英文时，会自动记录并在聊天框提示。\n可在对应页面查看、复制反馈。\n输入 /stcn show 可直接打开上次使用的功能页。" },
-        { "内置词典位置", "插件目录：\n游戏目录\\Interface\\AddOns\\ServerTextCN_Mcode\\\n\n窗口汉化词典：\nServerTextCN_Mcode_Data.lua\n\n战场播报与屏幕公告词典：\nAnnouncementRules.lua\n\n使用说明与 AI 补译提示词：\n使用说明-3.1.md" },
-        { "更新汉化", "遇到未收录的内容，需要补充或更新内置词典。\n你可以将对应词典文件和漏译记录交给 AI，请它辅助翻译并回填词典。\n具体步骤及可直接复制的 AI 提示词，请阅读插件目录内《使用说明-3.1.md》。\n修改词典时须同步更新词典版本号，保存文件后输入 /reload 生效。" },
+        { "内置词典位置", "插件目录：\n游戏目录\\Interface\\AddOns\\ServerTextCN_Mcode\\\n\n窗口汉化词典：\nServerTextCN_Mcode_Data.lua\n\n战场播报与屏幕公告词典：\nAnnouncementRules.lua\n\n使用说明与 AI 补译提示词：\nREADME.md" },
+        { "更新汉化", "遇到未收录的内容，需要补充或更新内置词典。\n你可以将对应词典文件和漏译记录交给 AI，请它辅助翻译并回填词典。\n具体步骤及可直接复制的 AI 提示词，请阅读插件目录内《README.md》。\n修改词典时须同步更新词典版本号，保存文件后输入 /reload 生效。" },
     }) do
         local heading = label(content, section[1], 0, 0)
         local body = label(content, section[2], 0, 0, "GameFontHighlight")

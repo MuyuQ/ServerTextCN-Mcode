@@ -82,7 +82,7 @@ ServerTextCN-Mcode/
 │   ├── Options.lua                  ← 设置界面（原生界面选项页）
 │   ├── ServerTextCN_Mcode.lua       ← 入口：事件注册、/stcn 命令
 │   ├── ServerTextCN_Mcode_Data.lua  ← 窗口内置词典（自动生成的数据文件，约 1.26 万行 / 3.5 MB）
-│   └── 使用说明-3.1.md              ← 随插件分发的使用与 AI 补译说明
+│   └── README.md                    ← 随插件分发的使用与 AI 补译说明（游戏内引用的就是它）
 ├── docs/                            ← 详细文档（见上方导航）
 └── tools/
     └── add_dictionary_entries.py    ← 词典批量补录工具（把 TSV 增量并入 Data.lua 并维护版本号）

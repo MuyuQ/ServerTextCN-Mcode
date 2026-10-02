@@ -196,7 +196,7 @@ function C.Record(module, raw, cn, tag, ctx, meta)
         local origin = module == "window" and (ctx.kind or "窗口") or (sources[ctx.source] or "公告")
         if module == "window" and ctx.npc and ctx.npc ~= "" then origin = origin .. "｜" .. C.Summary(ctx.npc, 24) end
         C.Print("已记录未汉化[" .. origin .. "]：" .. C.Summary(raw, 64)
-            .. "；/stcn show 查看。AI 补译请阅读插件目录《使用说明-3.1.md》。")
+            .. "；/stcn show 查看。AI 补译请阅读插件目录《README.md》。")
         C.Notifications.Show(module, item.key)
     end
     return item
