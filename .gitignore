@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.pyc
+
+# 工具备份与临时文件
+*.bak
+*.tmp
+采集记录/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+desktop.ini

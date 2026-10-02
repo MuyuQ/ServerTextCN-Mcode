@@ -1,0 +1,17 @@
+# ServerTextCN_Mcode 词典补录示例（TSV，UTF-8，英文与中文之间用制表符 Tab 分隔）
+# 用法：python tools/add_dictionary_entries.py 本文件          ← 演练，只报告不写入
+#       python tools/add_dictionary_entries.py 本文件 --write  ← 实际写入（自动备份 .bak）
+# 第 3 列可省略（默认 both：问候与菜单两边都进）；也可写 greet 或 menu。
+# 井号开头的行是注释；本示例里的词条都是演示占位，请换成你自己的真实词条。
+
+# —— 基本词条：英文<TAB>中文（进问候+菜单两张表） ——
+Howdy, $N! What brings you here?	你好呀，$N！是什么风把你吹来的？
+
+# —— 带译文的占位符：$n 角色名、$g男词:女词; 性别分支、$B 换行 ——
+Welcome to my forge, $N.	欢迎来到我的锻造坊，$N。$B$g兄弟:姐妹;，随便看。
+
+# —— 第 3 列 menu：只进菜单选项表（按钮上的短语） ——
+I would like to train.	我想要接受训练。	menu
+
+# —— 第 3 列 greet：只进问候语表（窗口顶部的段落） ——
+The winds guide you here, $N.	风把你引到了这里，$N。	greet
