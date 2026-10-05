@@ -1,7 +1,10 @@
 -- Rendering helpers for shipped built-in translations; no user rule compiler.
 local C = McodeSTCN
+-- {理由} added 2026-10-05 for the account-ban rule; values come from rule captures
+-- and are translated through AnnouncementRules' reason dictionary when available.
 local allowed = { ["玩家名"] = true, ["阵营"] = true, ["据点"] = true,
-    ["战场"] = true, ["数字"] = true, ["文本"] = true, ["职业"] = true, ["种族"] = true }
+    ["战场"] = true, ["数字"] = true, ["文本"] = true, ["职业"] = true, ["种族"] = true,
+    ["理由"] = true }
 local native = { n = "玩家名", N = "玩家名", c = "职业", C = "职业", r = "种族", R = "种族" }
 
 local function literal(text)

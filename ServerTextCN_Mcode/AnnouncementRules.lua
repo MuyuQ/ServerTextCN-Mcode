@@ -2,7 +2,9 @@
 -- Author: Mcode. Flags must precede generic node capture rules.
 local C = McodeSTCN
 -- 2026-10-01: add three observed system notices; retain the original 24 BG rules.
-local A = { list = {}, dictionaryVersion = "2026.10.01.1" }
+-- 2026-10-05: add AV victory/reinforcement, WSG wording variants, account-ban
+-- notices (system) and Nexus Chaotic Rift emotes (boss); uses the new {理由} marker.
+local A = { list = {}, dictionaryVersion = "2026.10.05.1" }
 C.AnnouncementRules = A
 local faction = { Alliance = "联盟", Horde = "部落" }
 local nodes = {
@@ -22,8 +24,17 @@ local battlefields = { ["Eye of the Storm"] = "风暴之眼", ["Warsong Gulch"] 
     ["Arathi Basin"] = "阿拉希盆地", ["Alterac Valley"] = "奥特兰克山谷",
     ["Strand of the Ancients"] = "远古海滩", ["Isle of Conquest"] = "征服之岛",
     ["Wintergrasp"] = "冬拥湖", ["Lake Wintergrasp"] = "冬拥湖" }
+-- Ban reasons observed in CHAT_MSG_SYSTEM (2026-10-03/04); unknown reasons fall
+-- back to the English text via A.Lookup instead of failing the rule.
+local reasons = {
+    ["Ninja looting in dungeons"] = "在地下城中黑装备",
+    ["Ninja looting in dungeon"] = "在地下城中黑装备",
+    ["Exploiting"] = "利用游戏漏洞",
+    ["Cheating"] = "作弊",
+    ["Harassment"] = "骚扰行为",
+}
 -- Exact dictionary contents are carried over from the backed-up 1.3 source.
-local dictionaries = { ["阵营"] = faction, ["据点"] = nodes, ["战场"] = battlefields }
+local dictionaries = { ["阵营"] = faction, ["据点"] = nodes, ["战场"] = battlefields, ["理由"] = reasons }
 local lower = {}
 for name, dict in pairs(dictionaries) do
     lower[name] = {}
@@ -157,6 +168,57 @@ add("system-global-channel", "系统公告：世界频道",
     "输入 /join global 加入世界频道，与其他玩家聊天或组建地下城队伍。",
     "Create dungeon groups and chat with other players by typing /join global",
     function() return {} end, "system")
+
+-- 2026-10-05: observed gaps and server wording variants (22 collected misses).
+-- Appended after the original rules, so an original rule still wins when it matches.
+add("bg-wins", "战场胜负", "^The (%a+) wins[!%.]$",
+    "The {阵营} wins!", "{阵营}获胜！",
+    "The Horde wins!", function(f)
+        if validFaction(f) then return { ["阵营"] = f } end
+    end)
+add("bg-reinforcements", "增援即将耗尽", "^The (%a+) Team is running out of reinforcements[!%.]$",
+    "The {阵营} Team is running out of reinforcements!", "{阵营}队伍的增援即将耗尽！",
+    "The Horde Team is running out of reinforcements!", function(f)
+        if validFaction(f) then return { ["阵营"] = f } end
+    end)
+add("flags-at-bases", "旗帜归位", "^The flags are now placed at their bases[!%.]$",
+    "The flags are now placed at their bases.", "双方旗帜已放回各自的基地。",
+    "The flags are now placed at their bases.", function() return {} end)
+add("countdown-30s-prepare", "开局倒计时：30 秒（带准备提示）", "^The [Bb]attle for (.+) begins in 30 seconds%. Prepare yourselves[!%.]$",
+    "The battle for {战场} begins in {数字} seconds. Prepare yourselves!", "距离{战场}的战斗开始还有 {数字} 秒。请做好准备！",
+    "The battle for Warsong Gulch begins in 30 seconds. Prepare yourselves!", function(b)
+        return { ["战场"] = b, ["数字"] = "30" }
+    end)
+add("battle-let-begin", "战斗开始（Let 句式）", "^Let the battle for (.+) begin[!%.]$",
+    "Let the battle for {战场} begin!", "让{战场}的战斗开始吧！",
+    "Let the battle for Warsong Gulch begin!", function(b) return { ["战场"] = b } end)
+add("flag-pickup-player-cap", "玩家拾取阵营旗帜（大写 Flag 变体）", "^The (%a+) Flag was picked up by (.+)[!%.]$",
+    "The {阵营} Flag was picked up by {玩家名}!", "{阵营}的旗帜被{玩家名}拾取了！",
+    "The Alliance Flag was picked up by Derpriest!", function(f, n)
+        if validFaction(f) then return { ["阵营"] = f, ["玩家名"] = n } end
+    end)
+add("player-captured-faction-flag", "玩家夺取阵营旗帜（无 has 变体）", "^(.+) captured the (%a+) [Ff]lag[!%.]$",
+    "{玩家名} captured the {阵营} flag!", "{玩家名}夺取了{阵营}的旗帜！",
+    "Derpriest captured the Alliance flag!", function(n, f)
+        if validFaction(f) then return { ["玩家名"] = n, ["阵营"] = f } end
+    end)
+-- Ban notices keep the server's red color; unknown reasons stay English via A.Lookup.
+add("system-account-banned", "系统公告：账号封禁", "^Account (.+) has been banned for (%d+)d, reason: (.+)[!%.]$",
+    "Account {文本} has been banned for {数字}d, reason: {理由}.",
+    "|cffff0000账号 {文本} 已被封禁 {数字} 天，原因：{理由}。|r",
+    "Account MARIANT*** has been banned for 5d, reason: Ninja looting in dungeons",
+    function(name, days, reason)
+        if name ~= "" and reason ~= "" then
+            return { ["文本"] = name, ["数字"] = days, ["理由"] = reason }
+        end
+    end, "system")
+-- Nexus (Anomalus) boss emotes; %s is filled in with the boss name by the display path.
+add("boss-chaotic-rift-open", "首领公告：打开混乱裂隙", "^%%s opens a Chaotic Rift![!%.]?$",
+    "%s opens a Chaotic Rift!", "%s打开了混乱裂隙！",
+    "%s opens a Chaotic Rift!", function() return {} end, "boss")
+add("boss-chaotic-rift-shield", "首领公告：护盾并转移力量", "^%%s shields himself and diverts his power to the rifts![!%.]?$",
+    "%s shields himself and diverts his power to the rifts!", "%s以护盾保护自己，并将力量转移给裂隙！",
+    "%s shields himself and diverts his power to the rifts!", function() return {} end, "boss")
 
 function A.Normalize(raw)
     local text = C.Normalize(raw)
