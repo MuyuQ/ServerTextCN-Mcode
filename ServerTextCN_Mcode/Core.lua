@@ -1,5 +1,5 @@
 -- ServerTextCN_Mcode 3.1: built-in translation and read-only feedback records.
-McodeSTCN = { version = "3.2", schema = 4, ready = false, listeners = {} }
+McodeSTCN = { version = "3.3", schema = 4, ready = false, listeners = {} }
 local C = McodeSTCN
 
 function C.Copy(value)

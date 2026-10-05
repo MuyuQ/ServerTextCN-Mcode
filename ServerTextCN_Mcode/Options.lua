@@ -376,7 +376,7 @@ function O.Show(module)
     if type(InterfaceOptionsFrame_OpenToCategory) == "function" then
         InterfaceOptionsFrame_OpenToCategory(O.pages[module].panel)
         InterfaceOptionsFrame_OpenToCategory(O.pages[module].panel)
-    else C.Print("请打开 ESC → 界面 → 插件 → ServerTextCN_Mcode。") end
+    else C.Print("请打开 ESC → 界面 → 插件 → 服务器文本汉化。") end
 end
 
 function O.ShowMiss(module, key)
@@ -400,8 +400,9 @@ function O.Register()
     O.registered = true
     local parent = InterfaceOptionsFramePanelContainer or UIParent
     local root = create("Frame", "McodeSTCNOptions", parent)
-    root.name = "ServerTextCN_Mcode"; root:SetAllPoints(parent); root:Hide()
-    label(root, "Mcode 服务器文本汉化", 16, -16, "GameFontNormalLarge")
+    -- 界面插件列表显示中文名；右栏标题用"插件名 + 中文名"（2026-10-05 用户定案）。
+    root.name = "服务器文本汉化"; root:SetAllPoints(parent); root:Hide()
+    label(root, "ServerTextCN_Mcode 服务器文本汉化", 16, -16, "GameFontNormalLarge")
     local scroll = create("ScrollFrame", nil, root, "UIPanelScrollFrameTemplate")
     scroll:SetPoint("TOPLEFT", 16, -50); scroll:SetPoint("BOTTOMRIGHT", -36, 16)
     local content = create("Frame", nil, scroll)
