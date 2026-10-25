@@ -1,5 +1,7 @@
 # ServerTextCN_Mcode —— 魔兽世界 3.3.5 服务器文本汉化插件
 
+![客户端](https://img.shields.io/badge/WoW-3.3.5a-blue) ![当前版本](https://img.shields.io/badge/当前版本-3.7.2-green) ![词典](https://img.shields.io/badge/词典-问候_5,423_·_菜单_2,022-orange) ![运行方式](https://img.shields.io/badge/离线运行-不联网_不上传-informational) ![许可](https://img.shields.io/badge/许可-GPL--2.0-lightgrey)
+
 **把服务器实时发来的英文文本，翻译成中文显示。**
 
 在你辛辛苦苦装好中文客户端之后，是不是还遇到过这种情况：
@@ -35,7 +37,7 @@
 
 ## 快速开始（3 步）
 
-1. **下载**：在本项目页面点击绿色 `Code` 按钮 → `Download ZIP`，解压得到 `ServerTextCN_Mcode` 文件夹。
+1. **下载**：在本项目页面点击绿色 `Code` 按钮 → `Download ZIP`，解压得到 `ServerTextCN_Mcode` 文件夹（如解压出 `-main` 后缀的目录名，改回 `ServerTextCN_Mcode`）。
 2. **放入插件目录**：把整个 `ServerTextCN_Mcode` 文件夹复制到
    `游戏目录\Interface\AddOns\` 下（没有这两个文件夹就新建；`游戏目录` 就是 Wow.exe 所在的文件夹）。
 3. **进游戏验证**：登录后输入 `/stcn show`，能弹出设置页即安装成功。
@@ -74,7 +76,7 @@ ServerTextCN-Mcode/
 │   ├── ServerTextCN_Mcode.toc       ← 插件清单（版本、加载顺序）
 │   ├── Core.lua                     ← 公共基础：归一化、上下文、记录、存档迁移
 │   ├── Window.lua                   ← 窗口汉化：四层匹配、占位符展开、界面钩子
-│   ├── AnnouncementRules.lua        ← 公告词典：24 条战场规则 + 系统公告（可编辑）
+│   ├── AnnouncementRules.lua        ← 公告词典：53 条内置规则（战场/系统/首领，可编辑）
 │   ├── Announcements.lua            ← 公告接入：聊天过滤器、事件采集、显示钩子
 │   ├── Templates.lua                ← 译文模板渲染（{玩家名}、$g男:女; 等标记）
 │   ├── VariableHints.lua            ← 3.2 起提供"占位符与变量线索"分析（只读，不参与匹配）
@@ -89,6 +91,19 @@ ServerTextCN-Mcode/
 ```
 
 ## 参与贡献
+
+日常补译的完整流转：
+
+```mermaid
+flowchart LR
+    A["开启功能和<br>漏译收集"] --> B["遇到英文<br>自动记录现场"]
+    B --> C["设置页查看<br>并复制反馈"]
+    C --> D["连同内置词典<br>交给 AI 审核补译"]
+    D --> E["增量回填词典<br>并更新词典版本号"]
+    E --> F["安装更新 /reload<br>重访同 NPC 验证"]
+    F -->|"命中"| G["漏译移出记录"]
+    F -->|"仍有问题"| C
+```
 
 欢迎以下三种参与方式（门槛从低到高）：
 
