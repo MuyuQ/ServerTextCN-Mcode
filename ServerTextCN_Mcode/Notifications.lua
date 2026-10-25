@@ -63,7 +63,7 @@ function N.Show(module, key)
     local frame, now = N.frame, GetTime()
     if not frame:IsShown() or not N.deadline or now >= N.deadline then N.count = 0 end
     N.count, N.module, N.key = N.count + 1, module, key
-    N.deadline = now + N.duration
+    if not N.deadline or now >= N.deadline then N.deadline = now + N.duration end
     frame.heading:SetText(N.count == 1 and "发现未汉化文本，已记录"
         or "已记录 " .. N.count .. " 条未汉化文本")
     frame.caption:SetText((N.count > 1 and "最近：" or "") .. moduleNames[module] .. " · 点击查看记录")

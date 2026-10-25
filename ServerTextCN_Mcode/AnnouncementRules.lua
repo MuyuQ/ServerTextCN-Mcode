@@ -4,8 +4,12 @@ local C = McodeSTCN
 -- 2026-10-01: add three observed system notices; retain the original 24 BG rules.
 -- 2026-10-05: add AV victory/reinforcement, WSG wording variants, account-ban
 -- notices (system) and Nexus Chaotic Rift emotes (boss); uses the new {理由} marker.
-local A = { list = {}, dictionaryVersion = "2026.10.05.1" }
+local A = { list = {}, dictionaryVersion = "2026.10.13.1", matchCache = {},
+    matchOrder = {}, matchBytes = 0, cacheHits = 0, cacheMisses = 0 }
 C.AnnouncementRules = A
+local CACHE_LIMIT = 128
+local CACHE_BYTES = 64 * 1024
+local CACHE_RAW_LIMIT = 2 * 1024
 local faction = { Alliance = "联盟", Horde = "部落" }
 local nodes = {
     ["Mage Tower"] = "法师塔", ["Draenei Ruins"] = "德莱尼废墟", ["Fel Reaver Ruins"] = "魔能机甲废墟",
@@ -17,6 +21,7 @@ local nodes = {
     ["Eastspark Workshop"] = "东火花车间", ["Westspark Workshop"] = "西火花车间",
     ["Dun Baldar"] = "登巴尔达", ["Stormpike Graveyard"] = "雷矛墓地", ["Icewing Bunker"] = "冰翼碉堡",
     ["Stonehearth Bunker"] = "石炉碉堡", ["Frostwolf Keep"] = "霜狼要塞", ["Frostwolf Graveyard"] = "霜狼墓地",
+    ["Mine"] = "金矿", ["Refinery"] = "炼油厂",
     ["Iceblood Graveyard"] = "冰血墓地", ["Tower Point"] = "哨塔高地", ["Snowfall Graveyard"] = "雪落墓地",
     ["Frostwolf Relief Hut"] = "霜狼急救所", ["Stormpike Aid Station"] = "雷矛急救站",
 }
@@ -32,6 +37,8 @@ local reasons = {
     ["Exploiting"] = "利用游戏漏洞",
     ["Cheating"] = "作弊",
     ["Harassment"] = "骚扰行为",
+    ["Bot"] = "使用机器人程序",
+    ["Anticheat violation #2"] = "反作弊违规 #2",
 }
 -- Exact dictionary contents are carried over from the backed-up 1.3 source.
 local dictionaries = { ["阵营"] = faction, ["据点"] = nodes, ["战场"] = battlefields, ["理由"] = reasons }
@@ -220,14 +227,129 @@ add("boss-chaotic-rift-shield", "首领公告：护盾并转移力量", "^%%s sh
     "%s shields himself and diverts his power to the rifts!", "%s以护盾保护自己，并将力量转移给裂隙！",
     "%s shields himself and diverts his power to the rifts!", function() return {} end, "boss")
 
+-- 2026-10-13: recorded BG, Blackrock and local server notices. Existing rules stay first.
+add("node-claimed-countdown", "玩家开始占领据点",
+    "^([^%s]+) claims the (.+)! If left unchallenged, the (%a+) will control it in 1 minute!$",
+    "{玩家名} claims the {据点}! If left unchallenged, the {阵营} will control it in 1 minute!",
+    "{玩家名}开始占领{据点}！若无人争夺，{阵营}将在 1 分钟后控制此处！",
+    "Pcode claims the Quarry! If left unchallenged, the Horde will control it in 1 minute!",
+    function(player, node, f)
+        if validFaction(f) and lower["据点"][string.lower(node)] then
+            return { ["玩家名"] = player, ["据点"] = node, ["阵营"] = f }
+        end
+    end)
+add("countdown-short-1m", "开局倒计时：省略战场名，1 分钟",
+    "^The battle will begin in 1 minute[!%.]$", "The battle will begin in 1 minute.",
+    "战斗将在 1 分钟后开始！", "The battle will begin in 1 minute.", function() return {} end)
+add("countdown-short-30s", "开局倒计时：省略战场名，30 秒",
+    "^The battle will begin in 30 seconds[!%.]$", "The battle will begin in 30 seconds!",
+    "战斗将在 30 秒后开始！", "The battle will begin in 30 seconds!", function() return {} end)
+add("boss-battle-start-short", "首领公告事件：战斗开始",
+    "^The battle has begun!$", "The battle has begun!", "战斗开始了！",
+    "The battle has begun!", function() return {} end, "boss")
+local gateDirections = { west = "西", east = "东", north = "北", south = "南" }
+add("keep-gate-destroyed", "要塞城门被摧毁",
+    "^The (%a+) gate of the (%a+) keep is destroyed!$",
+    "The {文本} gate of the {阵营} keep is destroyed!", "{阵营}要塞的{文本}门已被摧毁！",
+    "The west gate of the horde keep is destroyed!", function(direction, f)
+        if gateDirections[direction] and validFaction(f) then
+            return { ["文本"] = gateDirections[direction], ["阵营"] = f }
+        end
+    end)
+add("bg-wins-no-article", "战场胜负：省略 The", "^(%a+) wins[!%.]$",
+    "{阵营} wins!", "{阵营}获胜！", "Alliance wins!", function(f)
+        if validFaction(f) then return { ["阵营"] = f } end
+    end)
+add("flag-drop-player-capitalized", "玩家丢弃阵营旗帜：大写 Flag",
+    "^The (%a+) Flag (%a+%s*%a*) dropped by (.+)[!%.]$",
+    "The {阵营} Flag was dropped by {玩家名}!", "{阵营}的旗帜被{玩家名}丢弃了！",
+    "The Alliance Flag was dropped by Shocknana!", flagPlayer)
+add("flag-placed-at-base", "单方旗帜归位", "^The (%a+) flag is now placed at its base[!%.]$",
+    "The {阵营} flag is now placed at its base.", "{阵营}的旗帜已归位。",
+    "The Alliance flag is now placed at its base.", function(f)
+        if validFaction(f) then return { ["阵营"] = f } end
+    end)
+add("system-name-ban-days", "系统公告：无 Account 前缀的限时封禁",
+    "^([^%s]+) has been banned for (%d+)d, reason: (.+)[!%.]$",
+    "{文本} has been banned for {数字}d, reason: {理由}", "{文本}已被封禁 {数字} 天，原因：{理由}。",
+    "Yuko has been banned for 30d, reason: Anticheat violation #2",
+    function(name, days, reason) return { ["文本"] = name, ["数字"] = days, ["理由"] = reason } end, "system")
+add("system-account-ban-permanent", "系统公告：账号永久封禁",
+    "^Account (.-) has been banned permanently, reason: (.+)[!%.]$",
+    "Account {文本} has been banned permanently, reason: {理由}", "账号{文本}已被永久封禁，原因：{理由}。",
+    "Account ANDREYDE*** has been banned permanently, reason: Bot", function(name, reason)
+        if name ~= "" then return { ["文本"] = name, ["理由"] = reason } end
+    end, "system")
+add("system-blackrock-welcome", "系统公告：Blackrock 欢迎语",
+    "^Welcome to Blackrock%. The place to be for PvP%.$",
+    "Welcome to Blackrock. The place to be for PvP.", "欢迎来到 Blackrock，这里是 PvP 的理想之地。",
+    "Welcome to Blackrock. The place to be for PvP.", function() return {} end, "system")
+add("system-blackrock-3v3-hour", "系统公告：Blackrock 每周 3v3 活动",
+    "^Every Sunday at 19:00 Realm time, Blackrock hosts 3vs3 hour%. During this weekly event players will only be able to queue for 3vs3 for an hour%.$",
+    "Every Sunday at 19:00 Realm time, Blackrock hosts 3vs3 hour. During this weekly event players will only be able to queue for 3vs3 for an hour.",
+    "Blackrock 每周日服务器时间 19:00 举办一小时的 3v3 活动。活动期间，玩家在这一小时内只能排队参加 3v3 比赛。",
+    "Every Sunday at 19:00 Realm time, Blackrock hosts 3vs3 hour. During this weekly event players will only be able to queue for 3vs3 for an hour.",
+    function() return {} end, "system")
+add("system-azerothcore-welcome", "系统公告：AzerothCore 欢迎语",
+    "^Welcome to an AzerothCore server%.$", "Welcome to an AzerothCore server.",
+    "欢迎来到采用 AzerothCore 的服务器。", "Welcome to an AzerothCore server.", function() return {} end, "system")
+add("system-playerbots-module", "系统公告：mod-playerbots 模块",
+    "^This server runs with mod%-playerbots https://github%.com/liyunfan1223/mod%-playerbots[!%.]$",
+    "This server runs with mod-playerbots https://github.com/liyunfan1223/mod-playerbots",
+    "本服务器使用 |cff00ccffmod-playerbots|r 模块：|cffcccccchttps://github.com/liyunfan1223/mod-playerbots|r",
+    "This server runs with mod-playerbots https://github.com/liyunfan1223/mod-playerbots", function() return {} end, "system")
+add("system-playerbots-startup", "系统公告：机器人初始化耗时",
+    "^Playerbots: bot initialization at server startup takes about '(%d+%.?%d*)' minutes%.$",
+    "Playerbots: bot initialization at server startup takes about '{数字}' minutes.",
+    "Playerbots：服务器启动时，机器人初始化约需 {数字} 分钟。",
+    "Playerbots: bot initialization at server startup takes about '0.1' minutes.",
+    function(duration) return { ["数字"] = duration } end, "system")
+add("system-spec-reward-module", "系统公告：Spec Reward 模块",
+    "^This server is running the Spec Reward module%.$", "This server is running the Spec Reward module.",
+    "本服务器正在运行 |cff4CFF00Spec Reward（专精奖励）|r 模块。",
+    "This server is running the Spec Reward module.", function() return {} end, "system")
+
 function A.Normalize(raw)
     local text = C.Normalize(raw)
     if not text:find("[!%.]$") then text = text .. "!" end
     return text
 end
 
-function A.Capture(rule, raw)
-    local message = A.Normalize(raw)
+local function copyValues(values)
+    local copy = {}
+    for name, value in pairs(values or {}) do copy[name] = value end
+    return copy
+end
+
+function A.ClearCache()
+    A.matchCache, A.matchOrder = {}, {}
+    A.matchBytes, A.cacheHits, A.cacheMisses = 0, 0, 0
+end
+
+function A.CacheStats()
+    return { count = #A.matchOrder, rawBytes = A.matchBytes,
+        hits = A.cacheHits, misses = A.cacheMisses }
+end
+
+local function remember(source, raw, rule, values)
+    local byRaw = A.matchCache[source]
+    if not byRaw then byRaw = {}; A.matchCache[source] = byRaw end
+    local entry = { source = source, raw = raw, bytes = #raw, rule = rule, values = values }
+    byRaw[raw] = entry
+    A.matchOrder[#A.matchOrder + 1] = entry
+    A.matchBytes = A.matchBytes + #raw
+    while #A.matchOrder > CACHE_LIMIT or A.matchBytes > CACHE_BYTES do
+        local old = table.remove(A.matchOrder, 1)
+        if old then
+            A.matchBytes = math.max(0, A.matchBytes - old.bytes)
+            local oldSource = A.matchCache[old.source]
+            if oldSource and oldSource[old.raw] == old then oldSource[old.raw] = nil end
+        end
+    end
+end
+
+function A.Capture(rule, raw, message)
+    message = message or A.Normalize(raw)
     local args = { message:match(rule.pattern) }
     if args[1] == nil then return nil end
     local values = rule.capture(unpack(args))
@@ -240,16 +362,42 @@ function A.Capture(rule, raw)
     return values
 end
 
-function A.Translate(raw, source)
+local function match(raw, source)
     if type(raw) ~= "string" or raw == "" then return nil end
+    local cacheSource = source or "none"
+    if #raw > CACHE_RAW_LIMIT then
+        local message = A.Normalize(raw)
+        for _, rule in ipairs(A.list) do
+            local values = (rule.source == "bg" or rule.source == cacheSource) and A.Capture(rule, raw, message)
+            if values then return rule, values end
+        end
+        return nil
+    end
+    local byRaw = A.matchCache[cacheSource]
+    local entry = byRaw and byRaw[raw]
+    if entry then A.cacheHits = A.cacheHits + 1; return entry.rule, entry.values end
+    A.cacheMisses = A.cacheMisses + 1
+    local message = A.Normalize(raw)
     for _, rule in ipairs(A.list) do
         -- Preserve legacy BG display fallback; new notices require a known system source.
-        local values = (rule.source == "bg" or rule.source == source) and A.Capture(rule, raw)
+        local values = (rule.source == "bg" or rule.source == cacheSource) and A.Capture(rule, raw, message)
         if values then
-            local output = C.Render(rule.translation, values)
-            return C.WrapColor(raw, output), "builtin",
-                { id = rule.id, builtinID = rule.id,
-                    template = rule.template, values = values, evidence = "rule" }
+            remember(cacheSource, raw, rule, values)
+            return rule, values
         end
     end
+    remember(cacheSource, raw, false, false)
+    return nil
+end
+
+function A.Translate(raw, source)
+    local rule, values = match(raw, source)
+    if not rule then return nil end
+    if rule.translation ~= rule.tokenText then
+        rule.tokenText, rule.tokenInfo = rule.translation, C.Scan(rule.translation)
+    end
+    local output = C.RenderParsed(rule.translation, rule.tokenInfo, copyValues(values))
+    return C.WrapColor(raw, output), "builtin",
+        { id = rule.id, builtinID = rule.id,
+            template = rule.template, values = copyValues(values), evidence = "rule" }
 end

@@ -25,16 +25,17 @@ local function markers(raw)
         :gsub("|H.-|h(.-)|h", "%1"):gsub("|T.-|t", "")
     local result, i = {}, 1
     while i <= #s do
-        local tail, marker, kind = s:sub(i)
+        local marker, kind
         if s:sub(i, i + 1) == "%%" then i = i + 2
         else
             if s:sub(i, i) == "$" then
                 local code = s:sub(i + 1, i + 1)
                 kind = nativeNames[code]
                 if code == "g" or code == "G" then
-                    marker = tail:match("^%$[gG][^:;]+:[^;]+;")
+                    marker = s:sub(i):match("^%$[gG][^:;]+:[^;]+;")
                 elseif kind then marker = s:sub(i, i + 1) end
             elseif s:sub(i, i) == "%" then
+                local tail = s:sub(i)
                 marker = tail:match("^%%%d+%$[-+#0]*%d*%.?%d*[cdiouxXeEfgGqs]")
                     or tail:match("^%%[-+#0]*%d*%.?%d*[cdiouxXeEfgGqs]")
                 if marker then kind = "格式化标记（参数角色未知）" end

@@ -11,7 +11,7 @@ local function literal(text)
     return (text:gsub("([%^%$%(%)%%%.%[%]%*%+%-%?])", "%%%1"))
 end
 
-function C.Scan(text)
+function C.Scan(text, nativeOnly)
     if type(text) ~= "string" then return nil end
     local tokens, start, i = {}, 1, 1
     local function emit(last, token)
@@ -20,14 +20,14 @@ function C.Scan(text)
     end
     while i <= #text do
         local ch = text:sub(i, i)
-        if ch == "{" then
+        if ch == "{" and not nativeOnly then
             local close = text:find("}", i + 1, true)
             if not close then return nil end
             local name = text:sub(i + 1, close - 1)
             if not allowed[name] then return nil end
             emit(i - 1, { name = name, marker = text:sub(i, close) })
             i, start = close + 1, close + 1
-        elseif ch == "}" then return nil
+        elseif ch == "}" and not nativeOnly then return nil
         elseif ch == "$" then
             local code = text:sub(i + 1, i + 1)
             if native[code] then
@@ -38,11 +38,20 @@ function C.Scan(text)
                 i, start = i + 2, i + 2
             elseif code == "g" or code == "G" then
                 local finish = text:find(";", i + 2, true)
-                if not finish then return nil end
-                local male, female = text:sub(i + 2, finish - 1):match("^([^:]+):([^:]+)$")
-                if not male then return nil end
-                emit(i - 1, { gender = true, male = male, female = female, marker = text:sub(i, finish) })
-                i, start = finish + 1, finish + 1
+                local wide = text:find("；", i + 2, true)
+                local length = 1
+                if wide and (not finish or wide < finish) then finish, length = wide, #"；" end
+                local male, female
+                if finish then
+                    male, female = text:sub(i + 2, finish - 1):match("^([^:$;]+):([^:$;]+)$")
+                end
+                if male then
+                    male = male:match("^%s*(.-)%s*$"); female = female:match("^%s*(.-)%s*$")
+                    emit(i - 1, { gender = true, male = male, female = female,
+                        marker = text:sub(i, finish + length - 1) })
+                    i, start = finish + length, finish + length
+                elseif nativeOnly then i = i + 2
+                else return nil end
             else i = i + 1 end
         else i = i + 1 end
     end
@@ -50,10 +59,7 @@ function C.Scan(text)
     return { tokens = tokens }
 end
 
-function C.Render(text, values, player)
-    values, player = values or {}, player or C.Player()
-    local info = C.Scan(text)
-    if not info then return text end
+local function renderTokens(text, info, values, player)
     local parts = {}
     local playerVars = { ["玩家名"] = player.name, ["职业"] = player.class, ["种族"] = player.race }
     for _, token in ipairs(info.tokens) do
@@ -71,6 +77,25 @@ function C.Render(text, values, player)
         end
     end
     return table.concat(parts)
+end
+
+function C.Render(text, values, player)
+    values, player = values or {}, player or C.Player()
+    local info = C.Scan(text)
+    if not info then return text end
+    return renderTokens(text, info, values, player)
+end
+
+-- Native window markers also occur beside literal braces in server text.
+function C.RenderNative(text, player)
+    local info = C.Scan(text, true)
+    return info and renderTokens(text, info, {}, player or C.Player()) or text
+end
+
+function C.RenderParsed(text, info, values, player)
+    values, player = values or {}, player or C.Player()
+    if not info then return text end
+    return renderTokens(text, info, values, player)
 end
 
 function C.ColorValue(raw, value, translated)

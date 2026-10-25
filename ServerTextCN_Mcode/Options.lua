@@ -183,10 +183,12 @@ function O.RefreshList(page)
     local query = string.lower(state.query or "")
     for i = #list, 1, -1 do
         local item = list[i]
-        local haystack = string.lower(tostring(item.rawText or item.t or "") .. " " .. tostring(item.cn or "")
-            .. " " .. tostring(item.n or "") .. " " .. tostring(item.z or "") .. " " .. tostring(item.k or "")
-            .. " " .. tostring(sourceNames[item.source] or ""))
-        if query == "" or haystack:find(query, 1, true) then results[#results + 1] = item end
+        if query == "" then results[#results + 1] = item else
+            local haystack = string.lower(tostring(item.rawText or item.t or "") .. " " .. tostring(item.cn or "")
+                .. " " .. tostring(item.n or "") .. " " .. tostring(item.z or "") .. " " .. tostring(item.k or "")
+                .. " " .. tostring(sourceNames[item.source] or ""))
+            if haystack:find(query, 1, true) then results[#results + 1] = item end
+        end
     end
     local count = page.rowCount or 4
     state.offset = math.floor(math.max(0, math.min(state.offset or 0,
@@ -370,6 +372,13 @@ end
 
 function O.Show(module)
     if not O.registered then O.Register() end
+    if C.announcementConflict and not module then
+        if type(InterfaceOptionsFrame_OpenToCategory) == "function" then
+            InterfaceOptionsFrame_OpenToCategory(O.root)
+            InterfaceOptionsFrame_OpenToCategory(O.root)
+        else C.Print("请打开 ESC → 界面 → 插件 → 服务器文本汉化。") end
+        return
+    end
     module = module or McodeSTCN_DB.ui.lastModule
     if not O.pages[module] then module = "window" end
     McodeSTCN_DB.ui.lastModule = module
@@ -443,15 +452,15 @@ function O.Register()
             local height = math.ceil(fs:GetStringHeight()) + 4
             fs:SetHeight(height); y = y + height
         end
+        placeText(note); y = y + 14
+        conflict:ClearAllPoints(); conflict:SetPoint("TOPLEFT", 0, -y)
+        if C.announcementConflict then y = y + 35 end
         for _, section in ipairs(root.sections) do
             placeText(section.heading); y = y + 4
             placeText(section.body); y = y + 16
         end
-        placeText(note); y = y + 14
         debug:ClearAllPoints(); debug:SetPoint("TOPLEFT", -4, -y); y = y + 30
         placeText(debugHelp); y = y + 12
-        conflict:ClearAllPoints(); conflict:SetPoint("TOPLEFT", 0, -y)
-        if C.announcementConflict then y = y + 35 end
         content:SetHeight(y + 8); scroll:UpdateScrollChildRect()
     end
     root:SetScript("OnSizeChanged", function() root.layout() end)
@@ -459,7 +468,7 @@ function O.Register()
         debug.sync(); shown(conflict, C.announcementConflict == true)
         note:SetText("插件版本 " .. C.version .. "\n窗口词典 " .. C.DictionaryVersion("window") .. "\n"
             .. "公告词典 " .. C.DictionaryVersion("announcements")
-            .. (C.announcementConflict and "\n旧战场插件正在运行，公告模块已暂停。" or ""))
+            .. (C.announcementConflict and "\n\n冲突：旧版 Mcode_BGTextCN 仍在运行。\n公告汉化已暂停；窗口文本汉化不受影响。\n处理：点击“停用旧版并重载”，或在角色选择界面停用旧版。" or ""))
         root.layout()
     end)
     InterfaceOptions_AddCategory(root); O.root = root

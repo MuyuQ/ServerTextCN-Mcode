@@ -1,5 +1,5 @@
--- ServerTextCN_Mcode 3.1: built-in translation and read-only feedback records.
-McodeSTCN = { version = "3.4", schema = 4, ready = false, listeners = {} }
+-- ServerTextCN_Mcode 3.7.2: built-in translation and read-only feedback records.
+McodeSTCN = { version = "3.7.2", schema = 4, ready = false, listeners = {} }
 local C = McodeSTCN
 
 function C.Copy(value)
@@ -191,7 +191,7 @@ function C.Record(module, raw, cn, tag, ctx, meta)
     while #list > (hit and 200 or 300) do table.remove(list, 1) end
     if hit then C.RemoveMiss(module, raw, ctx) end
     C.Notify("records")
-    if not hit then
+    if not hit and not found then
         local sources = { bg = "战场播报", system = "系统通知", boss = "首领公告", info = "屏幕提示" }
         local origin = module == "window" and (ctx.kind or "窗口") or (sources[ctx.source] or "公告")
         if module == "window" and ctx.npc and ctx.npc ~= "" then origin = origin .. "｜" .. C.Summary(ctx.npc, 24) end
@@ -290,5 +290,6 @@ function C.Initialize()
         end
     end
     C.ready = true
+    if C.AnnouncementRules then C.AnnouncementRules.ClearCache() end
     if C.Window then C.Window.ClearCache() end
 end

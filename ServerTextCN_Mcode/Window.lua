@@ -46,17 +46,12 @@ do
 	end
 end
 
--- 小写索引（服务器措辞的大小写可能与词典不同）
 local MENU_LC = {}
-for k, v in pairs(MENU) do
-	if type(k) == "string" then MENU_LC[string.lower(k)] = v end
-end
 
 -- NPC 收敛索引（Data.lua）：问候/菜单各一张（键集不同，须配对查询）。
 -- 四层匹配（方案 npc-matching-plan）：L1 全库精确 → NPC 层（骨架精确→相似度）→ 透传。
 local NPC_INDEX = McodeSTCN_NPC or {}          -- 中文名 → GREET 键
 local NPC_INDEX_MENU = McodeSTCN_NPC_MENU or {} -- 中文名 → MENU 键
-local SIM_THRESHOLD = 0.9
 
 --------------------------------------------------------------------------
 -- 查找共享层（v1.8）
@@ -114,7 +109,7 @@ end
 local PLAYER_INFO = nil
 local function PlayerInfo()
 	if PLAYER_INFO then return PLAYER_INFO end
-	local p = { name = "", CLASS = "", class = "", RACE = "", race = "", male = true }
+	local p = { name = "", CLASS = "", class = "", RACE = "", race = "", sex = nil }
 	local ok, v
 	if type(UnitName) == "function" then
 		ok, v = pcall(UnitName, "player")
@@ -136,76 +131,47 @@ local function PlayerInfo()
 	end
 	if type(UnitSex) == "function" then
 		ok, v = pcall(UnitSex, "player")
-		if ok and type(v) == "number" then p.male = (v == 2) end   -- 2=男 3=女
+		if ok and type(v) == "number" then p.sex = v end   -- 2=男 3=女
 	end
 	PLAYER_INFO = p
 	return p
 end
 
 local function ExpandCN(text)
-	if type(text) ~= "string" or not text:find("%$") then return text end
-	local p = PlayerInfo()
-	-- $g sir:madam; —— 男:女 词对，可选 ";" 收尾（中英文分号都容）
-	text = text:gsub("%$[Gg]([^:；;%%$]+):([^:；;%%$]+);?", function(m, f)
-		local w = p.male and m or f
-		w = w:gsub("^%s+", "")
-		w = w:gsub("%s+$", "")
-		return w
-	end)
-	text = text:gsub("%$[Bb]", "\n")
-	if p.name ~= "" then
-		text = replace_word(text, "$N", p.name)
-		text = replace_word(text, "$n", p.name)
-	end
-	if p.CLASS ~= "" then
-		text = replace_word(text, "$C", p.CLASS)
-		text = replace_word(text, "$c", p.class)
-	end
-	if p.RACE ~= "" then
-		text = replace_word(text, "$R", p.RACE)
-		text = replace_word(text, "$r", p.race)
-	end
-	return text
+    if type(text) ~= "string" then return text end
+    local p = PlayerInfo()
+    return C.RenderNative(text, { name = p.name, class = p.CLASS, race = p.RACE, sex = p.sex })
 end
 
 local function DictLookup(dict, dict_lc, text)
-	if type(text) ~= "string" or text == "" then return nil end
-	local matched = text
-	local v = dict[text]
-	if v then return v, (dict[matched] and matched or (W.keyByDict[dict] and W.keyByDict[dict][string.lower(matched)]) or matched) end
-	v = dict_lc[string.lower(text)]
-	if v then return v, (dict[matched] and matched or (W.keyByDict[dict] and W.keyByDict[dict][string.lower(matched)]) or matched) end
-	if type(UnitName) ~= "function" then return nil end
-	local ok, pname = pcall(UnitName, "player")
-	if not ok or type(pname) ~= "string" or pname == "" then return nil end
-	if not text:find(pname, 1, true) then return nil end
-	for _, ph in ipairs({ "$n", "$N" }) do
-		local alt = plain_replace(text, pname, ph)
-		matched = alt
-		if alt ~= text then
-			v = dict[alt]
-			if v then return v, (dict[matched] and matched or (W.keyByDict[dict] and W.keyByDict[dict][string.lower(matched)]) or matched) end
-			v = dict_lc[string.lower(alt)]
-			if v then return v, (dict[matched] and matched or (W.keyByDict[dict] and W.keyByDict[dict][string.lower(matched)]) or matched) end
-		end
-	end
-	-- v1.9：训练师路径的服务器按同一条代码路径展开 $c/$C/$r/$R（$n 已实测展开）——
-	-- 把玩家自身的职业/种族词还原成占位符再试（词边界安全，防 damage 里的 mage）
-	local info = PlayerInfo()
-	for _, pair in ipairs({ { info.CLASS, "$C" }, { info.class, "$c" },
-	                        { info.RACE, "$R" }, { info.race, "$r" } }) do
-		if pair[1] ~= "" then
-			local alt = replace_word(text, pair[1], pair[2])
-			matched = alt
-			if alt ~= text then
-				v = dict[alt]
-				if v then return v, (dict[matched] and matched or (W.keyByDict[dict] and W.keyByDict[dict][string.lower(matched)]) or matched) end
-				v = dict_lc[string.lower(alt)]
-				if v then return v, (dict[matched] and matched or (W.keyByDict[dict] and W.keyByDict[dict][string.lower(matched)]) or matched) end
-			end
-		end
-	end
-	return nil
+    if type(text) ~= "string" or text == "" then return nil end
+    local function lookup(candidate)
+        if dict[candidate] then return dict[candidate], candidate end
+        local entry = dict_lc[string.lower(candidate)]
+        if entry then return entry.value, entry.key end
+    end
+    local value, key = lookup(text)
+    if value then return value, key end
+    local p = PlayerInfo()
+    local variants, seen = { text }, { [text] = true }
+    -- Each independent variable can be present alone or with the others.
+    for _, group in ipairs({ { { p.name, "$N" }, { p.name, "$n" } },
+        { { p.CLASS, "$C" }, { p.class, "$c" } },
+        { { p.RACE, "$R" }, { p.race, "$r" } } }) do
+        local count = #variants
+        for i = 1, count do
+            for _, pair in ipairs(group) do
+                if pair[1] ~= "" then
+                    local alt = replace_word(variants[i], pair[1], pair[2])
+                    if not seen[alt] then
+                        seen[alt] = true; variants[#variants + 1] = alt
+                        value, key = lookup(alt)
+                        if value then return value, key end
+                    end
+                end
+            end
+        end
+    end
 end
 
 --------------------------------------------------------------------------
@@ -219,15 +185,30 @@ end
 local NUM_BUTTONS = NUMGOSSIPBUTTONS or 32
 
 local GREET_LC = {}
-for key, value in pairs(GREET) do GREET_LC[string.lower(key)] = value end
 W.dictionaries = { menu = MENU, greeting = GREET }
 W.keyByDict = { [MENU] = {}, [GREET] = {} }
-for dict, index in pairs(W.keyByDict) do
-    for key in pairs(dict) do index[string.lower(key)] = key end
+W.caseConflicts = {}
+local function buildLower(dict, index)
+    local keys = {}
+    for key in pairs(dict) do keys[#keys + 1] = key end
+    table.sort(keys)
+    for _, key in ipairs(keys) do
+        local lower, previous = string.lower(key), index[string.lower(key)]
+        local equivalent = function(value) return value:gsub("%$[NnCcRr]", string.lower) end
+        if previous == nil then
+            index[lower] = { key = key, value = dict[key] }
+            W.keyByDict[dict][lower] = key
+        elseif previous and equivalent(previous.value) ~= equivalent(dict[key]) then
+            index[lower] = false; W.keyByDict[dict][lower] = nil
+            W.caseConflicts[#W.caseConflicts + 1] = { first = previous.key, second = key }
+        end
+    end
 end
+buildLower(MENU, MENU_LC); buildLower(GREET, GREET_LC)
 
 function W.ClearCache()
-    W.cache, W.cacheCount, W.seen = {}, 0, {}
+    W.cache, W.cacheCount, W.cacheBytes, W.seen = {}, 0, 0, {}
+    W.profiles, W.profileCount = {}, 0
     PLAYER_INFO = nil
 end
 
@@ -236,54 +217,29 @@ local function npcName()
 end
 
 local function skeleton(text)
-    return string.lower(text):gsub("%p", ""):gsub("%s", "")
+    -- Only case, whitespace and sentence-final punctuation are ignorable.
+    return string.lower(text):gsub("%s+", " "):gsub("[.!?]+$", "")
 end
 
 local function profile(kind, name)
     local id = kind .. "\031" .. name
-    if W.profiles[id] then return W.profiles[id] end
+    if W.profiles[id] ~= nil then return W.profiles[id] or nil end
+    if (W.profileCount or 0) >= 256 then W.profiles, W.profileCount = {}, 0 end
+    W.profileCount = (W.profileCount or 0) + 1
     local index = kind == "menu" and NPC_INDEX_MENU or NPC_INDEX
     local candidates = index[name]
     if type(candidates) ~= "table" then W.profiles[id] = false; return nil end
-    local dict, result = W.dictionaries[kind], { exact = {}, candidates = {} }
+    local dict, result = W.dictionaries[kind], { exact = {} }
     for _, key in ipairs(candidates) do
         if dict[key] then
             local sk = skeleton(key)
-            if not result.exact[sk] then result.exact[sk] = key end
-            result.candidates[#result.candidates + 1] = { key = key, skeleton = sk }
+            local previous = result.exact[sk]
+            if previous == nil then result.exact[sk] = key
+            elseif previous and dict[previous] ~= dict[key] then result.exact[sk] = false end
         end
     end
     W.profiles[id] = result
     return result
-end
-
--- Banded Levenshtein: only compute distances capable of passing the existing 0.9 gate.
--- This preserves accepted matches while skipping obviously distant strings.
-local function similarity(a, b)
-    local la, lb = #a, #b
-    if a == b then return 1 end
-    local maximum = math.max(la, lb)
-    local limit = math.floor(maximum * (1 - SIM_THRESHOLD) + 0.000001)
-    if math.abs(la - lb) > limit or la == 0 or lb == 0 then return 0 end
-    local infinity, previous = limit + 1, {}
-    for j = 0, math.min(lb, limit) do previous[j] = j end
-    for i = 1, la do
-        local current, lowest = {}, infinity
-        if i <= limit then current[0] = i end
-        for j = math.max(1, i - limit), math.min(lb, i + limit) do
-            local insert = (current[j - 1] or infinity) + 1
-            local delete = (previous[j] or infinity) + 1
-            local substitute = (previous[j - 1] or infinity) + (a:byte(i) == b:byte(j) and 0 or 1)
-            local distance = math.min(insert, delete, substitute)
-            current[j] = distance
-            if distance < lowest then lowest = distance end
-        end
-        if lowest > limit then return 0 end
-        previous = current
-    end
-    local distance = previous[lb] or infinity
-    if distance > limit then return 0 end
-    return 1 - distance / maximum
 end
 
 function W.LookupBuiltin(raw, kind, ctx, exactOnly)
@@ -298,14 +254,9 @@ function W.LookupBuiltin(raw, kind, ctx, exactOnly)
     local sk = skeleton(normalized)
     key = p.exact[sk]
     if key then return dict[key], "exact-npc", key end
-    local bestKey, bestScore = nil, 0
-    for _, candidate in ipairs(p.candidates) do
-        local score = similarity(sk, candidate.skeleton)
-        if score > bestScore then bestKey, bestScore = candidate.key, score end
-    end
-    if bestKey and bestScore >= SIM_THRESHOLD then
-        return dict[bestKey], string.format("sim(%.2f)", bestScore), bestKey
-    end
+    -- Similarity alone cannot establish meaning (negation, costs, quantities).
+    -- Unknown wording stays visible and enters the existing miss collection.
+
 end
 
 function W.Translate(raw, kind, ctx, exactOnly)
@@ -323,9 +274,15 @@ function W.Translate(raw, kind, ctx, exactOnly)
                 meta = { id = id, builtinID = id, template = matched,
                     evidence = tag == "exact" and "dictionary" or "candidate" } }
         else entry = {} end
-        W.cache[key] = entry
-        W.cacheCount = (W.cacheCount or 0) + 1
-        if W.cacheCount > 1024 then W.cache = { [key] = entry }; W.cacheCount = 1 end
+        local bytes = #key + #(entry.output or "")
+        if bytes <= 16384 then
+            if (W.cacheCount or 0) >= 1024 or (W.cacheBytes or 0) + bytes > 524288 then
+                W.cache, W.cacheCount, W.cacheBytes = {}, 0, 0
+            end
+            W.cache[key] = entry
+            W.cacheCount = (W.cacheCount or 0) + 1
+            W.cacheBytes = (W.cacheBytes or 0) + bytes
+        end
     end
     if entry.output then return C.WrapColor(raw, entry.output), entry.tag, entry.meta end
 end

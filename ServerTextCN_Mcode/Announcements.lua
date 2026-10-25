@@ -23,19 +23,25 @@ end
 
 function A.Translate(raw, event, speaker)
     if not C.Enabled("announcements") or type(raw) ~= "string" or raw == "" then return nil end
-    local ctx = A.Context(event, speaker)
-    local cn, tag, meta = C.AnnouncementRules.Translate(raw, ctx.source)
-    if cn and ctx.source == "boss" and type(speaker) == "string"
-        and not C.Read(string.format, (ctx.displayPrefix or "") .. cn, speaker, speaker) then return nil end
+    local source = A.events[event]
+    local cn, tag, meta = C.AnnouncementRules.Translate(raw, source)
+    if cn and source == "boss" and type(speaker) == "string" then
+        local prefix = _G["CHAT_" .. event:sub(10) .. "_GET"] or ""
+        if not C.Read(string.format, prefix .. cn, speaker, speaker) then return nil end
+    end
     return cn, tag, meta
 end
 
 function A.CheckConflict()
     local loaded = type(IsAddOnLoaded) == "function" and IsAddOnLoaded("Mcode_BGTextCN")
-    local was = C.announcementConflict
     C.announcementConflict = loaded and true or false
-    if C.announcementConflict and not was then
-        C.Print("旧 Mcode_BGTextCN 仍在运行，合并版公告模块已暂停。请在管理页停用旧版并重载。")
+    if C.announcementConflict and not A.conflictNoticeShown then
+        A.conflictNoticeShown = true
+        C.Print("检测到旧版 Mcode_BGTextCN 仍在运行。")
+        C.Print("为避免重复处理，ServerTextCN_Mcode 的公告汉化已暂停。")
+        C.Print("窗口文本汉化不受影响。")
+        C.Print("输入 /stcn show 打开设置，点击“停用旧版并重载”。")
+        C.Print("也可在角色选择界面停用 Mcode_BGTextCN 后再进入游戏。")
     end
     return C.announcementConflict
 end
@@ -74,6 +80,22 @@ function A.TryDisplayHooks()
     if A.CheckConflict() then return end
     A.WrapFrame(RaidBossEmoteFrame)
     A.WrapFrame(UIErrorsFrame)
+    if not A.slotHook and type(RaidNotice_SetSlot) == "function" then
+        local previous = RaidNotice_SetSlot
+        RaidNotice_SetSlot = function(slot, raw, ...)
+            -- ElvUI caches RaidNotice_AddMessage before our global hook is installed.
+            -- Its cached function still resolves this slot writer at display time.
+            if A.inEvent == 0 and RaidBossEmoteFrame
+                and (slot == RaidBossEmoteFrame.slot1 or slot == RaidBossEmoteFrame.slot2)
+                and C.Enabled("announcements") then
+                -- No event source is available here; keep the existing BG-only fallback.
+                local cn = C.AnnouncementRules.Translate(raw)
+                if cn then raw = cn end
+            end
+            return previous(slot, raw, ...)
+        end
+        A.slotHook = true
+    end
     if not A.raidHook and type(RaidNotice_AddMessage) == "function" then
         local previous = RaidNotice_AddMessage
         RaidNotice_AddMessage = function(frame, raw, ...)
